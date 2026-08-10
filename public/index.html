@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>游戏服务端 - 表结构可视化配置</title>
+  <link rel="stylesheet" href="/style.css" />
+</head>
+<body>
+  <header>
+    <h1>游戏服务端 · 表结构可视化配置</h1>
+    <p>在可视化页面配置好表结构，保存后自动建表并生成增删改查接口，无需写代码</p>
+  </header>
+
+  <main>
+    <!-- 左侧：表列表 + 新建表 -->
+    <section class="panel">
+      <h2>表列表</h2>
+      <ul id="tableList" class="table-list"></ul>
+
+      <h2>新建表</h2>
+      <div class="form-row">
+        <label>表名（英文）</label>
+        <input id="newTableName" placeholder="例如: player" />
+      </div>
+      <div class="form-row">
+        <label>表说明</label>
+        <input id="newTableComment" placeholder="例如: 玩家表" />
+      </div>
+      <div class="form-row">
+        <label>字段定义</label>
+        <button class="btn btn-mini" onclick="addFieldRow()">+ 添加字段</button>
+        <button class="btn btn-mini" onclick="addPkRow()">+ 添加自增主键</button>
+      </div>
+      <div id="newFields" class="fields-editor"></div>
+      <button class="btn btn-primary" onclick="createTable()">创建表</button>
+    </section>
+
+    <!-- 右侧：选中的表 -> 配置结构 + 数据管理 -->
+    <section class="panel" id="detailPanel">
+      <h2 id="detailTitle">选择左侧的表查看详情</h2>
+
+      <div id="configBox" class="hidden">
+        <h3>表结构配置</h3>
+        <div class="form-row">
+          <label>表说明</label>
+          <input id="editTableComment" />
+        </div>
+        <div id="editFields" class="fields-editor"></div>
+        <div>
+          <button class="btn btn-mini" onclick="addEditFieldRow()">+ 添加字段</button>
+          <button class="btn btn-primary" onclick="saveConfig()">保存配置（新增字段会执行 ALTER）</button>
+          <button class="btn btn-danger" onclick="deleteTable()">删除整张表</button>
+        </div>
+      </div>
+
+      <div id="dataBox" class="hidden">
+        <h3>基础接口（/api/dyn/<span id="dataApiTable"></span>）</h3>
+        <div id="apiDoc" class="api-doc"></div>
+        <h3>数据管理</h3>
+        <form id="insertForm" class="insert-form"></form>
+        <table class="data-table" id="dataTable">
+          <thead></thead>
+          <tbody></tbody>
+        </table>
+        <div class="pager">
+          <button class="btn btn-mini" id="prevPage" onclick="loadData(currentPage - 1)">上一页</button>
+          <span id="pageInfo"></span>
+          <button class="btn btn-mini" id="nextPage" onclick="loadData(currentPage + 1)">下一页</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
