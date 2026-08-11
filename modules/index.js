@@ -4,6 +4,7 @@
  */
 const Router = require('@koa/router')
 const user = require('./user')
+const player = require('./player')
 const tableMeta = require('./tableMeta')
 const dynCrud = require('./dynCrud')
 
@@ -16,6 +17,7 @@ router.get('/api/health', (ctx) => {
 
 // 注册各业务模块
 router.use(user.routes(), user.allowedMethods())
+router.use(player.routes(), player.allowedMethods())
 router.use(tableMeta.routes(), tableMeta.allowedMethods())
 router.use(dynCrud.routes(), dynCrud.allowedMethods())
 
