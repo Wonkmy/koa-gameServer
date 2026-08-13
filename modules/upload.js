@@ -38,8 +38,9 @@ const upload = multer({
 router.post('/api/upload', upload.single('file'), async (ctx) => {
     if (!ctx.file) return fail(ctx, '请选择图片文件')
     // 通过 /api/image/ 接口访问，避免宝塔Nginx反代拦截静态路径
-    // 宝塔Nginx做了SSL终止，Node收到的是http，这里强制用https
-    const url = `https://${ctx.request.host}/api/image/${ctx.file.filename}`;
+    // 宝塔Nginx做了SSL终止（443端口），Node是HTTP（3000端口），链接不能带端口号
+    const hostname = ctx.request.hostname; // 只取域名/IP，不带端口
+    const url = `https://${hostname}/api/image/${ctx.file.filename}`;
     ok(ctx, { url, filename: ctx.file.filename }, '上传成功')
 });
 
