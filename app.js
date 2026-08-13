@@ -27,13 +27,15 @@ async function main() {
   // 3. Swagger 接口文档页面
   app.use(koaSwagger({ routePrefix: '/api-docs', swaggerOptions: { spec: swaggerSpec } }));
 
-  // 4. 注册业务路由
+  // 4. 静态资源（图片上传目录，放在路由前面避免被拦截）
+  app.use(serve(path.join(__dirname, 'uploads'), { prefix: '/uploads' }));
+
+  // 5. 注册业务路由
   app.use(router.routes());
   app.use(router.allowedMethods());
 
-  // 5. 静态资源（可视化建表页面 + 图片上传目录）
+  // 6. 静态资源（可视化建表页面）
   app.use(serve(path.join(__dirname, 'public')));
-  app.use(serve(path.join(__dirname, 'uploads'), { prefix: '/uploads' }));
 
   // 6. 启动服务（自动查找可用端口，避免冲突）
   const actualPort = await config.findAvailablePort(config.port)
