@@ -14,7 +14,7 @@ const TRACK_TABLE = '`player_track`';
 router.post('/api/player/create', async (ctx) => {
     const { nickName, totalmoney } = ctx.request.body || {}
     if (!nickName) return fail(ctx, '缺少 nickName')
-    const money = parseInt(totalmoney) || 0
+    const money = parseInt(totalmoney) || 1000
     const result = await execute(
         `INSERT INTO ${TABLE} (nickName, totalmoney) VALUES (?, ?)`,
         [nickName, money]
