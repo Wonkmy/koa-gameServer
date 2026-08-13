@@ -36,6 +36,24 @@ router.post('/api/player/:id/money', async (ctx) => {
     ok(ctx, null, '更新成功')
 })
 
+// 查询玩家信息  GET /api/player/:id
+// 通过玩家id获取完整信息
+router.get('/api/player/:id', async (ctx) => {
+    const { id } = ctx.params
+    const rows = await query(`SELECT * FROM ${TABLE} WHERE id = ?`, [id])
+    if (!rows.length) return fail(ctx, '玩家不存在', 404)
+    ok(ctx, rows[0])
+})
+
+// 查询玩家信息  GET /api/player/:id
+// 通过玩家id获取完整信息
+router.get('/api/player/:id', async (ctx) => {
+    const { id } = ctx.params
+    const rows = await query(`SELECT * FROM ${TABLE} WHERE id = ?`, [id])
+    if (!rows.length) return fail(ctx, '玩家不存在', 404)
+    ok(ctx, rows[0])
+})
+
 // 查询金币  GET /api/player/:id/money
 // 获取指定玩家的总金币
 router.get('/api/player/:id/money', async (ctx) => {
