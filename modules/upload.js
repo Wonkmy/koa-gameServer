@@ -34,12 +34,42 @@ const upload = multer({
 });
 
 // 上传图片  POST /api/upload  body: FormData (file字段)
-// 返回图片预览链接
+// 返回图片预览链接（通过API接口访问，兼容宝塔Nginx反代）
 router.post('/api/upload', upload.single('file'), async (ctx) => {
     if (!ctx.file) return fail(ctx, '请选择图片文件')
-    // 返回可直接在浏览器预览的链接
-    const url = `http://${ctx.request.host}/uploads/${ctx.file.filename}`;
+    // 通过 /api/image/ 接口访问，避免宝塔Nginx反代拦截静态路径
+    const url = `http://${ctx.request.host}/api/image/${ctx.file.filename}`;
     ok(ctx, { url, filename: ctx.file.filename }, '上传成功')
+});
+
+// 预览图片  GET /api/image/:filename
+// 通过API接口返回图片，浏览器直接预览不下载
+router.get('/api/image/:filename', async (ctx) => {
+    const { filename } = ctx.params;
+    const filePath = path.join(UPLOAD_DIR, filename);
+
+    // 检查文件是否存在
+    if (!fs.existsSync(filePath)) {
+        ctx.status = 404;
+        ctx.body = '图片不存在';
+        return;
+    }
+
+    // 设置响应头，让浏览器直接预览
+    const ext = path.extname(filename).toLowerCase();
+    const mimeTypes = {
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.png': 'image/png',
+        '.gif': 'image/gif',
+        '.webp': 'image/webp',
+        '.bmp': 'image/bmp'
+    };
+    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+
+    ctx.set('Content-Type', mimeType);
+    ctx.set('Content-Disposition', 'inline'); // inline 表示预览，attachment 表示下载
+    ctx.body = fs.createReadStream(filePath);
 });
 
 module.exports = router;
