@@ -4,107 +4,110 @@ const { ok, fail } = require('../util/response');
 
 const router = new Router();
 const TABLE = '`player`';
-const BAG_TABLE = '`player_bag`';
-const APPID = "wx95b659fd6d604ea4";
-const SECRET = "f44da78ebfc2d9fee1985964dbfee908";
+const COMMENT_TABLE = '`player_comment`';
+const TRACK_TABLE = '`player_track`';
 
-// ==================== 登录接口 ====================
+// ==================== 玩家基础接口 ====================
 
-router.post('/api/player/wechatlogin', async (ctx) => {
-    const { code, nickName, avatarUrl } = ctx.request.body || {}
-    if (!code) return fail(ctx, 'code不能为空')
-
-    const url = `https://api.weixin.qq.com/sns/jscode2session?appid=${APPID}&secret=${SECRET}&js_code=${code}&grant_type=authorization_code`
-    let wxData
-    try {
-        const res = await fetch(url)
-        wxData = await res.json()
-    } catch (e) {
-        return fail(ctx, '微信接口请求失败')
-    }
-    if (wxData.errcode) return fail(ctx, wxData.errmsg)
-
-    // 检查用户是否存在
-    const rows = await query(`SELECT * FROM ${TABLE} WHERE openid = ?`, [wxData.openid])
-    if (rows.length) return ok(ctx, rows[0])
-
-    // 新用户注册：openid 必填，session_key 建议保存，nickName/avatarUrl 由客户端传入
-    await execute(
-        `INSERT INTO ${TABLE} (openid, score, nickName, avatarUrl,session_key) VALUES (?, ?, ?, ?, ?)`,
-        [wxData.openid, 0, nickName || '', avatarUrl || '', wxData.session_key]
+// 创建玩家  POST /api/player/create  body: { nickName, totalmoney }
+// 客户端刚进入游戏时调用，记录昵称和初始金币，返回玩家id
+router.post('/api/player/create', async (ctx) => {
+    const { nickName, totalmoney } = ctx.request.body || {}
+    if (!nickName) return fail(ctx, '缺少 nickName')
+    const money = parseInt(totalmoney) || 0
+    const result = await execute(
+        `INSERT INTO ${TABLE} (nickName, totalmoney) VALUES (?, ?)`,
+        [nickName, money]
     )
-
-    const newRows = await query(`SELECT * FROM ${TABLE} WHERE openid = ?`, [wxData.openid])
-    ok(ctx, newRows[0])
+    ok(ctx, { id: result.insertId }, '创建成功')
 })
 
-// ==================== 背包接口 ====================
+// 更新金币  POST /api/player/:id/money  body: { totalmoney }
+// 通过玩家id更新总金币（覆盖写入）
+router.post('/api/player/:id/money', async (ctx) => {
+    const { id } = ctx.params
+    const { totalmoney } = ctx.request.body || {}
+    if (totalmoney === undefined || totalmoney === null) return fail(ctx, '缺少 totalmoney')
+    const result = await execute(
+        `UPDATE ${TABLE} SET totalmoney = ? WHERE id = ?`,
+        [parseInt(totalmoney), id]
+    )
+    if (!result.affectedRows) return fail(ctx, '玩家不存在', 404)
+    ok(ctx, null, '更新成功')
+})
 
-// 获取背包列表  GET /api/player/:playerId/bag
-router.get('/api/player/:playerId/bag', async (ctx) => {
-    const { playerId } = ctx.params
-    const list = await query(`SELECT * FROM ${BAG_TABLE} WHERE playerId = ?`, [playerId])
+// 查询金币  GET /api/player/:id/money
+// 获取指定玩家的总金币
+router.get('/api/player/:id/money', async (ctx) => {
+    const { id } = ctx.params
+    const rows = await query(`SELECT id, nickName, totalmoney FROM ${TABLE} WHERE id = ?`, [id])
+    if (!rows.length) return fail(ctx, '玩家不存在', 404)
+    ok(ctx, rows[0])
+})
+
+// ==================== 评价接口 ====================
+
+// 提交评价  POST /api/player/:id/comment  body: { content }
+// 客户端提交评价内容，通过玩家id关联
+router.post('/api/player/:id/comment', async (ctx) => {
+    const { id } = ctx.params
+    const { content } = ctx.request.body || {}
+    if (!content) return fail(ctx, '缺少 content')
+    await execute(
+        `INSERT INTO ${COMMENT_TABLE} (playerId, content) VALUES (?, ?)`,
+        [id, content]
+    )
+    ok(ctx, null, '评价成功')
+})
+
+// 查询评价  GET /api/player/:id/comment
+// 获取指定玩家的所有评价记录
+router.get('/api/player/:id/comment', async (ctx) => {
+    const { id } = ctx.params
+    const list = await query(
+        `SELECT * FROM ${COMMENT_TABLE} WHERE playerId = ? ORDER BY createTime DESC`,
+        [id]
+    )
     ok(ctx, list)
 })
 
-// 添加物品  POST /api/player/:playerId/bag/add  body: { itemId, count }
-router.post('/api/player/:playerId/bag/add', async (ctx) => {
-    const { playerId } = ctx.params
-    const { itemId, count } = ctx.request.body || {}
-    if (!itemId) return fail(ctx, '缺少 itemId')
-    const n = Math.max(1, parseInt(count) || 1)
+// ==================== 埋点接口 ====================
 
-    // 查是否已有该物品
-    const rows = await query(`SELECT * FROM ${BAG_TABLE} WHERE playerId = ? AND itemId = ?`, [playerId, itemId])
+// 上报埋点  POST /api/player/:id/track  body: { scene }
+// 玩家进入某个场景或点击某个功能时调用，自动累加次数
+router.post('/api/player/:id/track', async (ctx) => {
+    const { id } = ctx.params
+    const { scene } = ctx.request.body || {}
+    if (!scene) return fail(ctx, '缺少 scene')
+
+    // 查是否已有该场景记录，有则累加次数，没有则新增
+    const rows = await query(
+        `SELECT * FROM ${TRACK_TABLE} WHERE playerId = ? AND scene = ?`,
+        [id, scene]
+    )
     if (rows.length) {
-        // 已有则累加数量
-        await execute(`UPDATE ${BAG_TABLE} SET count = count + ? WHERE playerId = ? AND itemId = ?`, [n, playerId, itemId])
+        await execute(
+            `UPDATE ${TRACK_TABLE} SET count = count + 1, updateTime = CURRENT_TIMESTAMP WHERE playerId = ? AND scene = ?`,
+            [id, scene]
+        )
     } else {
-        // 没有则新增
-        await execute(`INSERT INTO ${BAG_TABLE} (playerId, itemId, count) VALUES (?, ?, ?)`, [playerId, itemId, n])
+        await execute(
+            `INSERT INTO ${TRACK_TABLE} (playerId, scene, count) VALUES (?, ?, 1)`,
+            [id, scene]
+        )
     }
-    ok(ctx, null, '添加成功')
+    ok(ctx, null, '上报成功')
 })
 
-// 使用物品  POST /api/player/:playerId/bag/use  body: { itemId, count }
-router.post('/api/player/:playerId/bag/use', async (ctx) => {
-    const { playerId } = ctx.params
-    const { itemId, count } = ctx.request.body || {}
-    if (!itemId) return fail(ctx, '缺少 itemId')
-    const n = Math.max(1, parseInt(count) || 1)
-
-    const rows = await query(`SELECT * FROM ${BAG_TABLE} WHERE playerId = ? AND itemId = ?`, [playerId, itemId])
-    if (!rows.length) return fail(ctx, '物品不存在')
-    if (rows[0].count < n) return fail(ctx, '数量不足')
-
-    const newCount = rows[0].count - n
-    if (newCount <= 0) {
-        // 用完删除记录
-        await execute(`DELETE FROM ${BAG_TABLE} WHERE playerId = ? AND itemId = ?`, [playerId, itemId])
-    } else {
-        await execute(`UPDATE ${BAG_TABLE} SET count = ? WHERE playerId = ? AND itemId = ?`, [newCount, playerId, itemId])
-    }
-    ok(ctx, null, '使用成功')
-})
-
-// 丢弃物品  POST /api/player/:playerId/bag/discard  body: { itemId, count }
-router.post('/api/player/:playerId/bag/discard', async (ctx) => {
-    const { playerId } = ctx.params
-    const { itemId, count } = ctx.request.body || {}
-    if (!itemId) return fail(ctx, '缺少 itemId')
-    const n = Math.max(1, parseInt(count) || 1)
-
-    const rows = await query(`SELECT * FROM ${BAG_TABLE} WHERE playerId = ? AND itemId = ?`, [playerId, itemId])
-    if (!rows.length) return fail(ctx, '物品不存在')
-    if (rows[0].count < n) return fail(ctx, '数量不足')
-
-    const newCount = rows[0].count - n
-    if (newCount <= 0) {
-        await execute(`DELETE FROM ${BAG_TABLE} WHERE playerId = ? AND itemId = ?`, [playerId, itemId])
-    } else {
-        await execute(`UPDATE ${BAG_TABLE} SET count = ? WHERE playerId = ? AND itemId = ?`, [newCount, playerId, itemId])
-    }
-    ok(ctx, null, '丢弃成功')
+// 查询埋点  GET /api/player/:id/track
+// 获取指定玩家的所有埋点记录，按次数倒序
+router.get('/api/player/:id/track', async (ctx) => {
+    const { id } = ctx.params
+    const list = await query(
+        `SELECT * FROM ${TRACK_TABLE} WHERE playerId = ? ORDER BY count DESC`,
+        [id]
+    )
+    ok(ctx, list)
 })
 
 module.exports = router;
