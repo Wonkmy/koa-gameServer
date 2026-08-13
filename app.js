@@ -31,8 +31,9 @@ async function main() {
   app.use(router.routes());
   app.use(router.allowedMethods());
 
-  // 5. 静态资源（可视化建表页面）
+  // 5. 静态资源（可视化建表页面 + 图片上传目录）
   app.use(serve(path.join(__dirname, 'public')));
+  app.use(serve(path.join(__dirname, 'uploads'), { prefix: '/uploads' }));
 
   // 6. 启动服务（自动查找可用端口，避免冲突）
   const actualPort = await config.findAvailablePort(config.port)

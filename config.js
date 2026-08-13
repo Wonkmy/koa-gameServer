@@ -10,7 +10,7 @@ module.exports = {
 
   // MySQL 数据库配置
   db: {
-    host: '117.72.189.194',
+    host: '127.0.0.1',//117.72.189.194
     port: 3306,
     user: 'game_rank',
     password: '266973',

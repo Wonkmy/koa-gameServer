@@ -7,6 +7,7 @@ const user = require('./user')
 const player = require('./player')
 const tableMeta = require('./tableMeta')
 const dynCrud = require('./dynCrud')
+const upload = require('./upload')
 
 const router = new Router()
 
@@ -20,5 +21,6 @@ router.use(user.routes(), user.allowedMethods())
 router.use(player.routes(), player.allowedMethods())
 router.use(tableMeta.routes(), tableMeta.allowedMethods())
 router.use(dynCrud.routes(), dynCrud.allowedMethods())
+router.use(upload.routes(), upload.allowedMethods())
 
 module.exports = router
