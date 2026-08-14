@@ -36,14 +36,21 @@ router.post('/api/player/:id/money', async (ctx) => {
     ok(ctx, null, '更新成功')
 })
 
-// 查询玩家信息  GET /api/player/:id
-// 通过玩家id获取完整信息
-router.get('/api/player/:id', async (ctx) => {
+// 更新昵称  POST /api/player/:id/nickName  body: { nickName }
+// 通过玩家id更新昵称（覆盖写入）
+router.post('/api/player/:id/nickName', async (ctx) => {
     const { id } = ctx.params
-    const rows = await query(`SELECT * FROM ${TABLE} WHERE id = ?`, [id])
-    if (!rows.length) return fail(ctx, '玩家不存在', 404)
-    ok(ctx, rows[0])
+    const { nickName } = ctx.request.body || {}
+    if (nickName === undefined || nickName === null) return fail(ctx, '缺少 nickName')
+    const result = await execute(
+        `UPDATE ${TABLE} SET nickName = ? WHERE id = ?`,
+        [nickName, id]
+    )
+    if (!result.affectedRows) return fail(ctx, '玩家不存在', 404)
+    ok(ctx, null, '更新成功')
 })
+
+
 
 // 查询玩家信息  GET /api/player/:id
 // 通过玩家id获取完整信息
