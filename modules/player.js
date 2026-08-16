@@ -79,7 +79,7 @@ router.post('/api/player/:id/comment', async (ctx) => {
     const { content } = ctx.request.body || {}
     if (!content) return fail(ctx, '缺少 content')
     await execute(
-        `INSERT INTO ${COMMENT_TABLE} (playerId, content) VALUES (?, ?)`,
+        `INSERT INTO ${COMMENT_TABLE} (playerId, content, createTime) VALUES (?, ?, NOW())`,
         [id, content]
     )
     ok(ctx, null, '评价成功')
