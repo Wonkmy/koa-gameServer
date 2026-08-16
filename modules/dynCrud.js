@@ -79,10 +79,14 @@ router.get('/api/dyn/:table', loadTable, async (ctx) => {
   const { table, pk, fields } = ctx.state
   const page = Math.max(parseInt(ctx.query.page) || 1, 1)
   const pageSize = Math.min(Math.max(parseInt(ctx.query.pageSize) || 10, 1), 100)
+  // 支持自定义排序字段，默认按主键倒序
+  const sortBy = ctx.query.sortBy || ''
+  const validField = fields.find(f => f.name === sortBy)
+  const orderField = validField ? validField.name : pk
 
   const [{ total }] = await query(`SELECT COUNT(*) AS total FROM \`${table}\``)
   const list = await query(
-    `SELECT * FROM \`${table}\` ORDER BY \`${pk}\` DESC LIMIT ? OFFSET ?`,
+    `SELECT * FROM \`${table}\` ORDER BY \`${orderField}\` DESC LIMIT ? OFFSET ?`,
     [pageSize, (page - 1) * pageSize]
   )
   // 只返回分页数据，fields 元数据由 /api/table-meta/:tableName 接口提供
