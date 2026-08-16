@@ -15,10 +15,9 @@ router.post('/api/player/create', async (ctx) => {
     const { nickName, totalmoney } = ctx.request.body || {}
     if (!nickName) return fail(ctx, '缺少 nickName')
     const money = parseInt(totalmoney) || 1000
-    const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
     const result = await execute(
-        `INSERT INTO ${TABLE} (nickName, totalmoney, createTime) VALUES (?, ?, ?)`,
-        [nickName, money, now]
+        `INSERT INTO ${TABLE} (nickName, totalmoney, createTime) VALUES (?, ?, NOW())`,
+        [nickName, money]
     )
     ok(ctx, { id: result.insertId }, '创建成功')
 })
@@ -117,10 +116,9 @@ router.post('/api/player/:id/track', async (ctx) => {
             [id, scene]
         )
     } else {
-        const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
         await execute(
-            `INSERT INTO ${TRACK_TABLE} (playerId, scene, count, updateTime) VALUES (?, ?, 1, ?)`,
-            [id, scene, now]
+            `INSERT INTO ${TRACK_TABLE} (playerId, scene, count, updateTime) VALUES (?, ?, 1, NOW())`,
+            [id, scene]
         )
     }
     ok(ctx, null, '上报成功')
