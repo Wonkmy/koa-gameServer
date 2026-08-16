@@ -116,9 +116,10 @@ router.post('/api/player/:id/track', async (ctx) => {
             [id, scene]
         )
     } else {
+        const now = new Date().toISOString().slice(0, 19).replace('T', ' ')
         await execute(
-            `INSERT INTO ${TRACK_TABLE} (playerId, scene, count) VALUES (?, ?, 1)`,
-            [id, scene]
+            `INSERT INTO ${TRACK_TABLE} (playerId, scene, count, updateTime) VALUES (?, ?, 1, ?)`,
+            [id, scene, now]
         )
     }
     ok(ctx, null, '上报成功')
