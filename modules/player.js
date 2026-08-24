@@ -50,6 +50,20 @@ router.post('/api/player/:id/nickName', async (ctx) => {
     ok(ctx, null, '更新成功')
 })
 
+// 更新头像  POST /api/player/:id/avatar  body: { avatarUrl }
+// 通过玩家id更新头像地址（覆盖写入）
+router.post('/api/player/:id/avatar', async (ctx) => {
+    const { id } = ctx.params
+    const { avatarUrl } = ctx.request.body || {}
+    if (!avatarUrl) return fail(ctx, '缺少 avatarUrl')
+    const result = await execute(
+        `UPDATE ${TABLE} SET avatarUrl = ? WHERE id = ?`,
+        [avatarUrl, id]
+    )
+    if (!result.affectedRows) return fail(ctx, '玩家不存在', 404)
+    ok(ctx, null, '更新成功')
+})
+
 
 
 // 查询玩家信息  GET /api/player/:id
