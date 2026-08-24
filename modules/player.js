@@ -64,6 +64,20 @@ router.post('/api/player/:id/avatar', async (ctx) => {
     ok(ctx, null, '更新成功')
 })
 
+// 更新段位  POST /api/player/:id/rankTotal  body: { rankTotal }
+// 通过玩家id更新段位值（覆盖写入）
+router.post('/api/player/:id/rankTotal', async (ctx) => {
+    const { id } = ctx.params
+    const { rankTotal } = ctx.request.body || {}
+    if (rankTotal === undefined || rankTotal === null) return fail(ctx, '缺少 rankTotal')
+    const result = await execute(
+        `UPDATE ${TABLE} SET rankTotal = ? WHERE id = ?`,
+        [parseInt(rankTotal), id]
+    )
+    if (!result.affectedRows) return fail(ctx, '玩家不存在', 404)
+    ok(ctx, null, '更新成功')
+})
+
 
 
 // 查询玩家信息  GET /api/player/:id
