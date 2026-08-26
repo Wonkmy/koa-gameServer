@@ -16,7 +16,7 @@ router.post('/api/player/create', async (ctx) => {
     if (!nickName) return fail(ctx, '缺少 nickName')
     const money = parseInt(totalmoney) || 1000
     const result = await execute(
-        `INSERT INTO ${TABLE} (nickName, totalmoney, createTime) VALUES (?, ?, NOW())`,
+        `INSERT INTO ${TABLE} (nickName, totalmoney, createTime,avatarUrl,rankTotal) VALUES (?, ?, NOW(),"",0)`,
         [nickName, money]
     )
     ok(ctx, { id: result.insertId }, '创建成功')
