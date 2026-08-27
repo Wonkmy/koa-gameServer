@@ -6,6 +6,7 @@ const router = new Router();
 const TABLE = '`player`';
 const COMMENT_TABLE = '`player_comment`';
 const TRACK_TABLE = '`player_track`';
+const CONFIG_TABLE = '`sys_config`';
 
 // ==================== 玩家基础接口 ====================
 
@@ -161,6 +162,21 @@ router.get('/api/player/:id/track', async (ctx) => {
         [id]
     )
     ok(ctx, list)
+})
+
+// ==================== 通用配置读取 ====================
+
+// 读取配置值  GET /api/config?key=xxx
+// 客户端传 key，返回对应的 value，数据库里手动增删改
+router.get('/api/config', async (ctx) => {
+    const { key } = ctx.query
+    if (!key) return fail(ctx, '缺少 key 参数')
+    const rows = await query(
+        `SELECT value FROM ${CONFIG_TABLE} WHERE \`key\` = ?`,
+        [key]
+    )
+    if (!rows.length) return fail(ctx, '配置不存在', 404)
+    ok(ctx, { key, value: rows[0].value })
 })
 
 module.exports = router;
