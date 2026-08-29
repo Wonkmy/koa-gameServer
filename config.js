@@ -18,6 +18,12 @@ module.exports = {
     database: 'game_rank'
   },
 
+  // 微信小游戏配置：不要把真实 appSecret 提交到公开仓库
+  wx: {
+    appid: process.env.WX_APPID || '',
+    secret: process.env.WX_SECRET || ''
+  },
+
   // 自动查找可用端口：如果指定端口被占用，自动 +1 直到找到可用端口
   findAvailablePort(startPort) {
     return new Promise((resolve) => {

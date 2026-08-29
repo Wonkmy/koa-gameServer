@@ -1,12 +1,35 @@
 const Router = require('@koa/router');
 const { query, execute } = require('../db');
 const { ok, fail } = require('../util/response');
+const { codeToOpenid, sendSubscribeMessage } = require('../util/wechat');
 
 const router = new Router();
 const TABLE = '`player`';
 const COMMENT_TABLE = '`player_comment`';
 const TRACK_TABLE = '`player_track`';
 const CONFIG_TABLE = '`sys_config`';
+const SUBSCRIBE_TABLE = '`player_subscribe`';
+
+async function ensureSubscribeTable() {
+    // 给 player 表补 openid 字段，重复执行会被 catch 忽略。
+    try {
+        await execute(`ALTER TABLE ${TABLE} ADD COLUMN openid VARCHAR(128) NOT NULL DEFAULT '' COMMENT '微信openid'`)
+    } catch (e) {}
+
+    await execute(`
+        CREATE TABLE IF NOT EXISTS ${SUBSCRIBE_TABLE} (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            playerId INT NOT NULL,
+            openid VARCHAR(128) NOT NULL,
+            scene VARCHAR(64) NOT NULL,
+            templateId VARCHAR(128) NOT NULL,
+            used TINYINT NOT NULL DEFAULT 0,
+            createTime DATETIME DEFAULT CURRENT_TIMESTAMP,
+            sendTime DATETIME NULL,
+            UNIQUE KEY uniq_player_scene_template (playerId, scene, templateId)
+        ) COMMENT='玩家订阅消息记录'
+    `)
+}
 
 // ==================== 玩家基础接口 ====================
 
@@ -21,6 +44,102 @@ router.post('/api/player/create', async (ctx) => {
         [nickName, money]
     )
     ok(ctx, { id: result.insertId }, '创建成功')
+})
+
+// 保存微信openid  POST /api/player/:id/wx-login  body: { code }
+// 客户端 wx.login 后把 code 发来，服务端换 openid 并保存到 player 表。
+router.post('/api/player/:id/wx-login', async (ctx) => {
+    const { id } = ctx.params
+    const { code } = ctx.request.body || {}
+    if (!code) return fail(ctx, '缺少 code')
+
+    try {
+        await ensureSubscribeTable()
+        const openid = await codeToOpenid(code)
+        const result = await execute(
+            `UPDATE ${TABLE} SET openid = ? WHERE id = ?`,
+            [openid, id]
+        )
+        if (!result.affectedRows) return fail(ctx, '玩家不存在', 404)
+        ok(ctx, { openid }, '保存openid成功')
+    } catch (err) {
+        console.error('保存openid失败', err)
+        fail(ctx, err.message || '保存openid失败', 500)
+    }
+})
+
+// 保存订阅记录  POST /api/player/:id/subscribe  body: { code, scene, templateId }
+// 用户同意订阅后调用，一次订阅通常只能发送一次。
+router.post('/api/player/:id/subscribe', async (ctx) => {
+    const { id } = ctx.params
+    const { code, scene, templateId } = ctx.request.body || {}
+    if (!scene) return fail(ctx, '缺少 scene')
+    if (!templateId) return fail(ctx, '缺少 templateId')
+
+    try {
+        await ensureSubscribeTable()
+        let rows = await query(`SELECT openid FROM ${TABLE} WHERE id = ?`, [id])
+        if (!rows.length) return fail(ctx, '玩家不存在', 404)
+
+        let openid = rows[0].openid
+        if (!openid && code) {
+            openid = await codeToOpenid(code)
+            await execute(`UPDATE ${TABLE} SET openid = ? WHERE id = ?`, [openid, id])
+        }
+        if (!openid) return fail(ctx, '缺少 openid，请先调用 wx-login')
+
+        await execute(
+            `INSERT INTO ${SUBSCRIBE_TABLE} (playerId, openid, scene, templateId, used, createTime)
+             VALUES (?, ?, ?, ?, 0, NOW())
+             ON DUPLICATE KEY UPDATE openid = VALUES(openid), used = 0, createTime = NOW(), sendTime = NULL`,
+            [id, openid, scene, templateId]
+        )
+        ok(ctx, null, '订阅记录保存成功')
+    } catch (err) {
+        console.error('保存订阅记录失败', err)
+        fail(ctx, err.message || '保存订阅记录失败', 500)
+    }
+})
+
+// 发送订阅消息  POST /api/subscribe/send  body: { scene, templateId, page, time, content, reward, feature }
+// 这个接口建议只由你自己在服务器命令行或后台调用，不要暴露给普通玩家。
+router.post('/api/subscribe/send', async (ctx) => {
+    const { scene, templateId, page, time, content, reward, feature } = ctx.request.body || {}
+    if (!scene) return fail(ctx, '缺少 scene')
+    if (!templateId) return fail(ctx, '缺少 templateId')
+
+    try {
+        await ensureSubscribeTable()
+        const list = await query(
+            `SELECT * FROM ${SUBSCRIBE_TABLE} WHERE scene = ? AND templateId = ? AND used = 0`,
+            [scene, templateId]
+        )
+
+        let success = 0
+        let failCount = 0
+        for (const item of list) {
+            // 对应微信后台“活动提醒”模板字段：活动时间、活动内容、活动奖励、功能。
+            const data = {
+                time1: { value: time || new Date().toISOString().slice(0, 16).replace('T', ' ') },
+                thing2: { value: content || '中秋月市限时开摊' },
+                thing3: { value: reward || '节日限定旧物' },
+                thing4: { value: feature || '高货专摊' }
+            }
+            const result = await sendSubscribeMessage(item.openid, templateId, page, data)
+            if (result.errcode === 0) {
+                success++
+                await execute(`UPDATE ${SUBSCRIBE_TABLE} SET used = 1, sendTime = NOW() WHERE id = ?`, [item.id])
+            } else {
+                failCount++
+                console.error('发送订阅消息失败', item.playerId, result)
+            }
+        }
+
+        ok(ctx, { total: list.length, success, fail: failCount }, '发送完成')
+    } catch (err) {
+        console.error('发送订阅消息异常', err)
+        fail(ctx, err.message || '发送订阅消息失败', 500)
+    }
 })
 
 // 更新金币  POST /api/player/:id/money  body: { totalmoney }

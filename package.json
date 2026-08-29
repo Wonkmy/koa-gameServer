@@ -4,7 +4,8 @@
   "description": "基于 Koa 的游戏服务端框架，支持可视化建表和动态 CRUD",
   "main": "app.js",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "send:subscribe": "node scripts/sendSubscribe.js"
   },
   "keywords": [],
   "author": "",
